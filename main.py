@@ -49,7 +49,6 @@ class SavingsAccount(Account):
         self._bal -= a
         self._tx.append(Transaction("Withdraw", a, self._bal))
 
-
 class CurrentAccount(Account):
     def withdraw(self, a):
         if a > self._bal:
@@ -115,6 +114,7 @@ class SBI(Bank):
 class HDFC(Bank):
     pass
 
+
 def atm(b):
     while True:
         print("\nATM Menu:")
@@ -157,9 +157,11 @@ def atm(b):
             if "blocked" in str(e):
                 break
 
+
 print("Welcome to the ATM!")
 
-while True:
+bank_attempts = 0
+while bank_attempts < 4:
     print("\nSelect your bank:")
     print("1. SBI Savings  2. HDFC Current")
 
@@ -175,10 +177,14 @@ while True:
             bank = HDFC(5678, account)
             break
         else:
-            print("Invalid choice. Please enter 1 or 2.")
+            bank_attempts += 1
+            print("Invalid choice. Attempts left:", 4 - bank_attempts)
     except ValueError:
-        print("Invalid input. Enter a number only.")
-
+        bank_attempts += 1
+        print("Invalid input. Attempts left:", 4 - bank_attempts)
+else:
+    print("Too many wrong bank selections. Exiting...")
+    exit()
 
 while True:
     try:
