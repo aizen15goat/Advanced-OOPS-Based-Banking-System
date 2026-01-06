@@ -1,200 +1,213 @@
 from abc import ABC, abstractmethod
+import time
 
 class Transaction:
-    def __init__(self, t, a, b):
-        self.t = t
-        self.a = a
-        self.b = b
+    def __init__(self, ttype, amt, bal):
+        self.ttype = ttype
+        self.amt = amt
+        self.bal = bal
+        self.time = time.strftime("%H:%M")
 
-    def __str__(self):
-        return f"{self.t} | Amount: {self.a} | Balance: {self.b}"
+    def show(self):
+        return f"{self.ttype}: ${self.amt} at {self.time} | Balance: ${self.bal}"
 
 
 class Account(ABC):
-    def __init__(self, bal):
-        self._bal = bal
-        self._tx = []
-
+    def __init__(self, startbal):
+        self.balance = startbal
+        self.translist = []
+    
     @abstractmethod
-    def withdraw(self, a):
+    def takeout(self, money):
         pass
 
-    def deposit(self, a):
-        if a <= 0:
-            raise ValueError("Deposit must be positive")
-        self._bal += a
-        self._tx.append(Transaction("Deposit", a, self._bal))
+    def putin(self, money):
+        if money < 1:
+            raise ValueError("Need positive amount")
+        self.balance = self.balance + money
+        trans = Transaction("Deposit", money, self.balance)
+        self.translist.append(trans)
 
-    def balance(self):
-        return self._bal
+    def seebalance(self):
+        return self.balance
 
-    def history(self):
-        if not self._tx:
-            print("No transactions yet.")
-        for t in self._tx:
-            print(t)
-
-
-class SavingsAccount(Account):
-    def __init__(self, bal):
-        super().__init__(bal)
-        self._limit = 5000
-        self._min_balance = 2000
-
-    def withdraw(self, a):
-        if a > self._limit:
-            raise ValueError("Daily withdrawal limit exceeded")
-        if self._bal - a < self._min_balance:
-            raise ValueError("Minimum balance of 2000 must be maintained")
-        self._bal -= a
-        self._tx.append(Transaction("Withdraw", a, self._bal))
-
-class CurrentAccount(Account):
-    def withdraw(self, a):
-        if a > self._bal:
-            raise ValueError("Insufficient balance")
-        self._bal -= a
-        self._tx.append(Transaction("Withdraw", a, self._bal))
+    def seehistory(self):
+        if not self.translist:
+            print("Empty history")
+        else:
+            for item in self.translist:
+                print(item.show())
 
 
-class Bank(ABC):
-    def __init__(self, pin, acc):
-        self._pin = pin
-        self._acc = acc
-        self._blocked = False
-        self._pin_attempts = 0
-
-    def auth(self, p):
-        if self._blocked:
-            raise ValueError("Card is blocked. Visit your bank.")
-
-        if p != self._pin:
-            self._pin_attempts += 1
-            if self._pin_attempts >= 3:
-                self._blocked = True
-                raise ValueError("Card blocked due to 3 wrong PIN attempts")
-            raise ValueError("Wrong PIN")
-
-        self._pin_attempts = 0
-
-    def change_pin(self, old_pin, new_pin):
-        if self._blocked:
-            raise ValueError("Card is blocked. Visit your bank.")
-
-        if old_pin != self._pin:
-            self._pin_attempts += 1
-            if self._pin_attempts >= 3:
-                self._blocked = True
-                raise ValueError("Card blocked due to 3 wrong PIN attempts")
-            raise ValueError("Old PIN is incorrect")
-
-        if len(str(new_pin)) != 4:
-            raise ValueError("PIN must be exactly 4 digits")
-
-        self._pin = new_pin
-        self._pin_attempts = 0
-        print("PIN changed successfully")
-
-    def withdraw(self, a):
-        self._acc.withdraw(a)
-
-    def deposit(self, a):
-        self._acc.deposit(a)
-
-    def balance(self):
-        return self._acc.balance()
-
-    def history(self):
-        self._acc.history()
+class SavingsAcc(Account):
+    def __init__(self, startbal):
+        super().__init__(startbal)
+        self.limitday = 5000
+        self.keepmin = 2000
+    
+    def takeout(self, money):
+        if money > self.limitday:
+            raise ValueError("Over daily limit")
+        if self.balance - money < self.keepmin:
+            raise ValueError("Below minimum requirement")
+        self.balance = self.balance - money
+        self.translist.append(Transaction("Withdraw", money, self.balance))
 
 
-class SBI(Bank):
+class CurrentAcc(Account):
+    def takeout(self, money):
+        if money > self.balance:
+            raise ValueError("Not enough funds")
+        self.balance = self.balance - money
+        self.translist.append(Transaction("Withdraw", money, self.balance))
+
+
+class BankCard:
+    def __init__(self, pincode, accobj):
+        self.pincode = pincode
+        self.accobj = accobj
+        self.blockedflag = False
+        self.failcount = 0
+
+    def checkpin(self, pininput):
+        if self.blockedflag:
+            raise ValueError("Card blocked - go to bank")
+        
+        if pininput != self.pincode:
+            self.failcount = self.failcount + 1
+            if self.failcount >= 3:
+                self.blockedflag = True
+                raise ValueError("Card blocked after 3 fails")
+            raise ValueError("Wrong pin code")
+        
+        self.failcount = 0
+
+    def changepin(self, oldpin, newpin):
+        if self.blockedflag:
+            raise ValueError("Card blocked")
+        
+        if oldpin != self.pincode:
+            self.failcount += 1
+            if self.failcount >= 3:
+                self.blockedflag = True
+                raise ValueError("Card blocked")
+            raise ValueError("Old pin wrong")
+        
+        if len(str(newpin)) != 4:
+            raise ValueError("Need 4 digits")
+        
+        self.pincode = newpin
+        print("Pin changed")
+
+    def withdrawmoney(self, amount):
+        self.accobj.takeout(amount)
+
+    def depositmoney(self, amount):
+        self.accobj.putin(amount)
+
+    def getbalance(self):
+        return self.accobj.seebalance()
+
+    def gethistory(self):
+        self.accobj.seehistory()
+
+
+class SBIcard(BankCard):
     pass
 
-class HDFC(Bank):
+
+class HDFCcard(BankCard):
     pass
 
 
-def atm(b):
+def atmprocess(card):
     while True:
-        print("\nATM Menu:")
-        print("1. Balance  2. Withdraw  3. Deposit  4. History  5. Exit  6. Change PIN")
+        print("\nATM Menu")
+        print("1. Balance")
+        print("2. Withdraw")
+        print("3. Deposit")
+        print("4. History")
+        print("5. Change PIN")
+        print("6. Exit")
 
         try:
-            choice = int(input("Enter your choice (1-6): "))
+            option = int(input("Pick option (1-6): "))
 
-            if choice == 1:
-                print("Balance:", b.balance())
+            if option == 1:
+                print(f"Balance: ${card.getbalance()}")
 
-            elif choice == 2:
-                amount = float(input("Enter amount to withdraw: "))
-                b.withdraw(amount)
-                print("Withdrawal successful")
+            elif option == 2:
+                money = float(input("Withdraw amount: "))
+                card.withdrawmoney(money)
+                print("Done")
 
-            elif choice == 3:
-                amount = float(input("Enter amount to deposit: "))
-                b.deposit(amount)
-                print("Deposit successful")
+            elif option == 3:
+                money = float(input("Deposit amount: "))
+                card.depositmoney(money)
+                print("Done")
 
-            elif choice == 4:
-                print("Transaction History:")
-                b.history()
+            elif option == 4:
+                card.gethistory()
 
-            elif choice == 6:
-                old = int(input("Enter current PIN: "))
-                new = int(input("Enter new 4-digit PIN: "))
-                b.change_pin(old, new)
+            elif option == 5:
+                oldpin = int(input("Current PIN: "))
+                newpin = int(input("New PIN (4 digits): "))
+                card.changepin(oldpin, newpin)
 
-            elif choice == 5:
-                print("Thank you for using the ATM!")
+            elif option == 6:
+                print("Goodbye")
                 break
 
             else:
-                print("Invalid choice. Enter 1-6 only.")
+                print("Bad choice")
 
-        except ValueError as e:
-            print("Error:", e)
-            if "blocked" in str(e):
+        except ValueError as err:
+            print(f"Error: {err}")
+            if "blocked" in str(err):
                 break
 
 
-print("Welcome to the ATM!")
+print("ATM System Start")
 
-bank_attempts = 0
-while bank_attempts < 4:
-    print("\nSelect your bank:")
-    print("1. SBI Savings  2. HDFC Current")
+trycount = 0
+mycard = None
 
+while trycount < 3:
+    print("\nChoose Bank")
+    print("1. SBI Savings")
+    print("2. HDFC Current")
+    
     try:
-        bank_choice = int(input("Enter choice (1 or 2): "))
-
-        if bank_choice == 1:
-            account = SavingsAccount(10000)
-            bank = SBI(1234, account)
+        bankpick = int(input("Enter 1 or 2: "))
+        
+        if bankpick == 1:
+            acc = SavingsAcc(10000)
+            mycard = SBIcard(1234, acc)
             break
-        elif bank_choice == 2:
-            account = CurrentAccount(20000)
-            bank = HDFC(5678, account)
+        elif bankpick == 2:
+            acc = CurrentAcc(20000)
+            mycard = HDFCcard(5678, acc)
             break
         else:
-            bank_attempts += 1
-            print("Invalid choice. Attempts left:", 4 - bank_attempts)
-    except ValueError:
-        bank_attempts += 1
-        print("Invalid input. Attempts left:", 4 - bank_attempts)
-else:
-    print("Too many wrong bank selections. Exiting...")
+            trycount += 1
+            print(f"Wrong choice, tries left: {3 - trycount}")
+    except:
+        trycount += 1
+        print(f"Bad input, tries left: {3 - trycount}")
+
+if trycount >= 3:
+    print("Too many fails")
     exit()
 
 while True:
     try:
-        pin = int(input("Enter your PIN: "))
-        bank.auth(pin)
-        print("Authentication successful!")
+        pinenter = int(input("Enter PIN: "))
+        mycard.checkpin(pinenter)
+        print("PIN correct")
         break
-    except ValueError as e:
-        print(e)
-        if "blocked" in str(e):
+    except ValueError as err:
+        print(err)
+        if "blocked" in str(err):
             exit()
 
-atm(bank)
+atmprocess(mycard)
