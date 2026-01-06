@@ -40,9 +40,6 @@ Technologies Used
 
 How to Run
 
-Clone the repository:
-git clone https://github.com/your-username/banking-oops-python.git
-
 
 Navigate to the project directory:
 cd banking-oops-python
